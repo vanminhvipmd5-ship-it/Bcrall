@@ -1,14 +1,17 @@
-// =====================================================
-// 🎰 BACCARAT AI VIP PRO - SERVER FULL TIẾNG VIỆT
-// 📌 API: /bcr/:table
-// ✅ Lấy dữ liệu API gốc
-// ✅ AI dự đoán Nhà Cái / Con
-// ✅ Bắt cầu bệt - đảo - 1-1 - cầu phức hợp
-// ✅ Độ tin cậy
+// =======================================================
+// 🎰 BACCARAT AI VIP PRO MAX
+// ✅ Full bàn 1-10 + C01-C16
+// ✅ AI thuật toán cầu nâng cao
+// ✅ Cầu bệt
+// ✅ Cầu đảo
+// ✅ Cầu 1-1
+// ✅ Cầu nghiêng
+// ✅ Cầu phức hợp
+// ✅ Độ tin cậy AI
 // ✅ Lưu lịch sử
-// ✅ Endpoint: 1-10 + C01-C16
-// ✅ Realtime auto update
-// =====================================================
+// ✅ API realtime
+// ✅ Anti lỗi Render
+// =======================================================
 
 const express = require("express");
 const axios = require("axios");
@@ -21,402 +24,519 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-// =============================================
+// =======================================================
 // API GỐC
-// =============================================
+// =======================================================
 
-const SOURCE_API = "http://103.159.50.60:5000/sexy/1";
-const ALL_TABLE_API = "http://103.159.50.60:5000/sexy";
+const API_URL = "http://103.159.50.60:5000/sexy";
 
-// =============================================
-// LƯU LỊCH SỬ
-// =============================================
+// =======================================================
+// LƯU CACHE + HISTORY
+// =======================================================
 
-let historyStore = {};
-let cacheData = {};
+let cache = [];
+let history = {};
 
-// =============================================
+// =======================================================
 // DANH SÁCH BÀN
-// =============================================
+// =======================================================
 
-const tables = [
+const TABLES = [
   "1","2","3","4","5","6","7","8","9","10",
   "C01","C02","C03","C04","C05","C06","C07","C08",
   "C09","C10","C11","C12","C13","C14","C15","C16"
 ];
 
-// =============================================
-// HÀM CHUYỂN TABLE
-// =============================================
+// =======================================================
+// CHUYỂN TABLE
+// =======================================================
 
-function convertTable(table) {
-  if (table.startsWith("C")) {
-    return (1000 + parseInt(table.replace("C", ""))).toString();
+function getTableName(item) {
+
+  if (parseInt(item.table_id) >= 1001) {
+
+    return "C" + (
+      parseInt(item.table_id) - 1000
+    ).toString().padStart(2, "0");
+
   }
-  return table;
+
+  return item.table_name;
 }
 
-// =============================================
-// PHÂN TÍCH CẦU
-// =============================================
+// =======================================================
+// TÍNH %
+// =======================================================
+
+function percent(a, b) {
+
+  if (b === 0) return 0;
+
+  return ((a / b) * 100).toFixed(1);
+}
+
+// =======================================================
+// AI THUẬT TOÁN
+// =======================================================
 
 function analyzeRoad(result) {
 
-  if (!result || result.length < 5) {
+  if (!result) {
+
     return {
       predict: "BANKER",
+      bet: "NHÀ CÁI",
       confidence: 50,
-      reason: "Không đủ dữ liệu",
-      betSide: "NHÀ CÁI",
-      road: "Không xác định"
+      road: "Không có dữ liệu",
+      reason: "Chờ dữ liệu"
     };
+
   }
 
-  const data = result.replace(/T/g, "");
+  // bỏ T
+  let data = result.replace(/T/g, "");
 
-  let banker = 0;
-  let player = 0;
+  // tối thiểu
+  if (data.length < 4) {
 
-  for (let c of data) {
-    if (c === "B") banker++;
-    if (c === "P") player++;
+    return {
+      predict: "BANKER",
+      bet: "NHÀ CÁI",
+      confidence: 50,
+      road: "Dữ liệu ít",
+      reason: "Không đủ dữ liệu"
+    };
+
   }
 
-  // =========================================
-  // CẦU BỆT
-  // =========================================
+  // =====================================================
+  // ĐẾM
+  // =====================================================
 
-  let last4 = data.slice(-4);
+  let B = 0;
+  let P = 0;
 
-  let roadName = "Cầu hỗn hợp";
+  for (let i of data) {
+
+    if (i === "B") B++;
+    if (i === "P") P++;
+
+  }
+
+  // =====================================================
+  // LAST
+  // =====================================================
+
+  const last1 = data.slice(-1);
+  const last2 = data.slice(-2);
+  const last3 = data.slice(-3);
+  const last4 = data.slice(-4);
+  const last6 = data.slice(-6);
+  const last8 = data.slice(-8);
+
+  // =====================================================
+  // DEFAULT
+  // =====================================================
+
   let predict = "BANKER";
   let confidence = 50;
-  let reason = "";
+  let road = "Hỗn hợp";
+  let reason = "AI cơ bản";
 
-  // Bệt Banker
+  // =====================================================
+  // CẦU BỆT SIÊU MẠNH
+  // =====================================================
+
   if (/BBBB/.test(last4)) {
+
     predict = "BANKER";
-    confidence = 92;
-    roadName = "Cầu Bệt Nhà Cái";
-    reason = "Bệt mạnh tiếp tục";
+    confidence = 96;
+    road = "Cầu Bệt Nhà Cái";
+    reason = "4 bệt Banker";
+
   }
 
-  // Bệt Player
   else if (/PPPP/.test(last4)) {
+
     predict = "PLAYER";
-    confidence = 92;
-    roadName = "Cầu Bệt Con";
-    reason = "Bệt mạnh tiếp tục";
+    confidence = 96;
+    road = "Cầu Bệt Con";
+    reason = "4 bệt Player";
+
   }
 
-  // =========================================
+  // =====================================================
   // CẦU ĐẢO
-  // =========================================
+  // =====================================================
 
-  else if (/BPBP|PBPB/.test(data.slice(-8))) {
+  else if (/BPBPBP|PBPBPB/.test(last6)) {
 
-    const last = data.slice(-1);
-
-    predict = last === "B"
+    predict = last1 === "B"
       ? "PLAYER"
       : "BANKER";
 
-    confidence = 87;
+    confidence = 90;
 
-    roadName = "Cầu Đảo";
-    reason = "Cầu đảo liên tục";
+    road = "Cầu Đảo";
+
+    reason = "Đảo liên tục";
+
   }
 
-  // =========================================
-  // CẦU 1-1
-  // =========================================
+  // =====================================================
+  // CẦU 2-2
+  // =====================================================
 
-  else if (/BPBPBP|PBPBPB/.test(data.slice(-10))) {
+  else if (
+    /BBPPBB|PPBBPP/.test(last6)
+  ) {
 
-    const last = data.slice(-1);
-
-    predict = last === "B"
+    predict = last2 === "BB"
       ? "PLAYER"
       : "BANKER";
 
-    confidence = 84;
+    confidence = 88;
 
-    roadName = "Cầu 1-1";
-    reason = "Đang chạy 1-1";
+    road = "Cầu 2-2";
+
+    reason = "Đang chạy 2-2";
+
   }
 
-  // =========================================
-  // CẦU NGHIÊNG
-  // =========================================
+  // =====================================================
+  // CẦU 3-3
+  // =====================================================
+
+  else if (
+    /BBBPPP|PPPBBB/.test(last6)
+  ) {
+
+    predict = last3 === "BBB"
+      ? "PLAYER"
+      : "BANKER";
+
+    confidence = 85;
+
+    road = "Cầu 3-3";
+
+    reason = "Đang chạy 3-3";
+
+  }
+
+  // =====================================================
+  // CẦU PHỨC HỢP
+  // =====================================================
 
   else {
 
-    const total = banker + player;
+    const bankerRate = percent(B, data.length);
+    const playerRate = percent(P, data.length);
 
-    const bankerRate = (banker / total) * 100;
-    const playerRate = (player / total) * 100;
+    if (B > P) {
 
-    if (bankerRate > playerRate) {
       predict = "BANKER";
-      confidence = bankerRate.toFixed(1);
-      roadName = "Cầu Nghiêng Nhà Cái";
-      reason = "Tỷ lệ Banker cao hơn";
-    } else {
-      predict = "PLAYER";
-      confidence = playerRate.toFixed(1);
-      roadName = "Cầu Nghiêng Con";
-      reason = "Tỷ lệ Player cao hơn";
+      confidence = bankerRate;
+      road = "Cầu Nghiêng Nhà Cái";
+      reason = "Tỷ lệ Banker cao";
+
     }
+
+    else {
+
+      predict = "PLAYER";
+      confidence = playerRate;
+      road = "Cầu Nghiêng Con";
+      reason = "Tỷ lệ Player cao";
+
+    }
+
   }
 
-  // =========================================
-  // BẮT CẦU ĐẢO THÔNG MINH
-  // =========================================
+  // =====================================================
+  // BET
+  // =====================================================
 
-  let betSide = predict === "BANKER"
+  const bet = predict === "BANKER"
     ? "NHÀ CÁI"
     : "CON";
 
   return {
+
     predict,
+    bet,
     confidence,
-    banker,
-    player,
-    road: roadName,
+    road,
     reason,
-    betSide
+
+    banker_total: B,
+    player_total: P,
+
+    banker_percent: percent(B, data.length),
+    player_percent: percent(P, data.length)
+
   };
+
 }
 
-// =============================================
-// API /bcr/:table
-// =============================================
+// =======================================================
+// UPDATE CACHE
+// =======================================================
 
-app.get("/bcr/:table", async (req, res) => {
+async function updateCache() {
 
   try {
 
-    let table = req.params.table.toUpperCase();
+    const res = await axios.get(API_URL);
 
-    if (!tables.includes(table)) {
-      return res.json({
-        status: false,
-        message: "❌ Bàn không tồn tại"
-      });
-    }
+    cache = res.data.data || [];
 
-    let tableId = convertTable(table);
-
-    const response = await axios.get(ALL_TABLE_API);
-
-    const allData = response.data.data || [];
-
-    const currentTable = allData.find(
-      t => t.table_id == tableId
+    console.log(
+      "✅ UPDATE:",
+      new Date().toLocaleTimeString("vi-VN")
     );
 
-    if (!currentTable) {
-      return res.json({
-        status: false,
-        message: "❌ Không tìm thấy dữ liệu bàn"
-      });
-    }
+  } catch (e) {
 
-    const result = currentTable.result || "";
-
-    // =========================================
-    // AI PHÂN TÍCH
-    // =========================================
-
-    const ai = analyzeRoad(result);
-
-    // =========================================
-    // LƯU LỊCH SỬ
-    // =========================================
-
-    if (!historyStore[table]) {
-      historyStore[table] = [];
-    }
-
-    historyStore[table].push({
-      time: new Date().toLocaleTimeString("vi-VN"),
-      predict: ai.predict,
-      confidence: ai.confidence
-    });
-
-    if (historyStore[table].length > 20) {
-      historyStore[table].shift();
-    }
-
-    // =========================================
-    // RESPONSE
-    // =========================================
-
-    res.json({
-
-      status: true,
-
-      table: table,
-
-      game: currentTable.game_code,
-
-      ket_qua: result,
-
-      du_doan: ai.betSide,
-
-      ai_predict: ai.predict,
-
-      do_tin_cay: ai.confidence + "%",
-
-      loai_cau: ai.road,
-
-      ly_do: ai.reason,
-
-      banker_count: ai.banker,
-
-      player_count: ai.player,
-
-      good_road: currentTable.goodRoad || "Không có",
-
-      lich_su: historyStore[table],
-
-      update: new Date().toLocaleTimeString("vi-VN")
-
-    });
-
-  } catch (err) {
-
-    res.json({
-      status: false,
-      error: err.message
-    });
+    console.log("❌ API ERROR:", e.message);
 
   }
 
+}
+
+// =======================================================
+// LOOP REALTIME
+// =======================================================
+
+setInterval(updateCache, 4000);
+
+updateCache();
+
+// =======================================================
+// HOME
+// =======================================================
+
+app.get("/", (req, res) => {
+
+  res.send(`
+  <center>
+
+    <h1>🎰 BACCARAT AI VIP PRO MAX</h1>
+
+    <p>✅ API Đang Hoạt Động</p>
+
+    <hr>
+
+    <h3>📌 ENDPOINT</h3>
+
+    <p>/bcr</p>
+
+    <p>/bcr/1</p>
+
+    <p>/bcr/2</p>
+
+    <p>/bcr/C01</p>
+
+    <p>/bcr/C16</p>
+
+  </center>
+  `);
+
 });
 
-// =============================================
-// API ALL TABLE
-// =============================================
+// =======================================================
+// FULL TABLE
+// =======================================================
 
 app.get("/bcr", async (req, res) => {
 
   try {
 
-    const response = await axios.get(ALL_TABLE_API);
-
-    const allData = response.data.data || [];
-
     let output = [];
 
-    for (let item of allData) {
+    for (let item of cache) {
 
-      let tableName = item.table_name;
+      let table = getTableName(item);
 
-      if (!tables.includes(tableName)) continue;
+      if (!TABLES.includes(table)) continue;
 
-      const ai = analyzeRoad(item.result || "");
+      const result = item.result || "";
+
+      if (!result) continue;
+
+      const ai = analyzeRoad(result);
+
+      // ===============================================
+      // HISTORY
+      // ===============================================
+
+      if (!history[table]) {
+        history[table] = [];
+      }
+
+      history[table].push({
+        predict: ai.bet,
+        confidence: ai.confidence,
+        time: new Date().toLocaleTimeString("vi-VN")
+      });
+
+      if (history[table].length > 20) {
+        history[table].shift();
+      }
 
       output.push({
 
-        table: tableName,
+        table,
 
         game: item.game_code,
 
-        predict: ai.betSide,
+        predict: ai.bet,
+
+        ai_predict: ai.predict,
 
         confidence: ai.confidence + "%",
 
         road: ai.road,
 
-        goodRoad: item.goodRoad || "",
+        reason: ai.reason,
 
-        result_length: item.result.length
+        banker_total: ai.banker_total,
+
+        player_total: ai.player_total,
+
+        banker_percent: ai.banker_percent + "%",
+
+        player_percent: ai.player_percent + "%",
+
+        good_road: item.goodRoad || "",
+
+        result,
+
+        history: history[table],
+
+        update: new Date().toLocaleTimeString("vi-VN")
 
       });
 
     }
 
     res.json({
+
       status: true,
+
       total: output.length,
-      data: output,
-      update: new Date().toLocaleTimeString("vi-VN")
+
+      server: "BACCARAT AI VIP PRO MAX",
+
+      update: new Date().toLocaleTimeString("vi-VN"),
+
+      data: output
+
     });
 
-  } catch (err) {
+  } catch (e) {
 
     res.json({
       status: false,
-      error: err.message
+      error: e.message
     });
 
   }
 
 });
 
-// =============================================
-// AUTO UPDATE CACHE
-// =============================================
+// =======================================================
+// SINGLE TABLE
+// =======================================================
 
-async function autoLoop() {
+app.get("/bcr/:table", async (req, res) => {
 
   try {
 
-    const response = await axios.get(ALL_TABLE_API);
+    const tableReq = req.params.table.toUpperCase();
 
-    cacheData = response.data;
+    let found = null;
 
-    console.log(
-      "✅ Update:",
-      new Date().toLocaleTimeString("vi-VN")
-    );
+    for (let item of cache) {
 
-  } catch (err) {
+      let table = getTableName(item);
 
-    console.log("❌ API lỗi:", err.message);
+      if (table === tableReq) {
+
+        found = item;
+
+        break;
+
+      }
+
+    }
+
+    if (!found) {
+
+      return res.json({
+        status: false,
+        message: "Không tìm thấy bàn"
+      });
+
+    }
+
+    const ai = analyzeRoad(found.result || "");
+
+    res.json({
+
+      status: true,
+
+      table: tableReq,
+
+      game: found.game_code,
+
+      predict: ai.bet,
+
+      ai_predict: ai.predict,
+
+      confidence: ai.confidence + "%",
+
+      road: ai.road,
+
+      reason: ai.reason,
+
+      banker_total: ai.banker_total,
+
+      player_total: ai.player_total,
+
+      banker_percent: ai.banker_percent + "%",
+
+      player_percent: ai.player_percent + "%",
+
+      good_road: found.goodRoad || "",
+
+      result: found.result,
+
+      history: history[tableReq] || [],
+
+      update: new Date().toLocaleTimeString("vi-VN")
+
+    });
+
+  } catch (e) {
+
+    res.json({
+      status: false,
+      error: e.message
+    });
 
   }
 
-}
-
-// =============================================
-// VÒNG LẶP TỐI ƯU
-// =============================================
-
-setInterval(autoLoop, 4000);
-
-// =============================================
-// HOME
-// =============================================
-
-app.get("/", (req, res) => {
-
-  res.send(`
-    <h1>🎰 Baccarat AI VIP PRO</h1>
-
-    <p>📌 Endpoint:</p>
-
-    <ul>
-      <li>/bcr</li>
-      <li>/bcr/1</li>
-      <li>/bcr/2</li>
-      <li>/bcr/C01</li>
-      <li>/bcr/C16</li>
-    </ul>
-  `);
-
 });
 
-// =============================================
-// START SERVER
-// =============================================
+// =======================================================
+// START
+// =======================================================
 
 app.listen(PORT, () => {
 
-  console.log("=================================");
-  console.log("🎰 BACCARAT AI VIP PRO");
+  console.log("==================================");
+  console.log("🎰 BACCARAT AI VIP PRO MAX");
   console.log("🚀 PORT:", PORT);
-  console.log("=================================");
+  console.log("==================================");
 
 });
